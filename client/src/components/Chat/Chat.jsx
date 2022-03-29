@@ -1,43 +1,64 @@
-import { useState, useEffect } from "react"
-import socket from './../Socket/Socket'
-const Chat = ({ name }) => {
+import { useEffect, useState } from "react"
+import ScrollToBottom from 'react-scroll-to-bottom'
 
-    const [message, setMessage] = useState('')
-    const [messages, setMessages] = useState([])
+const Chat = ({ socket, username, room }) => {
 
-    useEffect(() => {
-        socket.emit('conectado', name)
-    }, [name])
+    const [currentMessage, setCurrentMessage] = useState('')
+    const [messageList, setMessageList] = useState([])
 
-    useEffect(() => {
-        socket.on('messages', message => {
-            setMessages([...messages, message])
-        })
-
-        return () => {
-            socket.off()
+    const sendMessage = async () => {
+        if (currentMessage !== '') {
+            const messageData = {
+                room: room,
+                author: username,
+                message: currentMessage,
+                time: new Date(Date.now()).getHours() + ':' + new Date(Date.now()).getMinutes()
+            }
+            await socket.emit('send_message', messageData)
+            setMessageList((list) => [...list, messageData])
+            setCurrentMessage('')
         }
-    }, [messages])
-
-    const handleSubmit = e => {
-        e.preventDefault()
-
-        socket.emit('mensaje', name, message)
-        setMessage('')
     }
 
-    console.log(messages);
+    useEffect(() => {
+        socket.on('receive_message', (data) => {
+            setMessageList((list) => [...list, data])
+        })
+    }, [socket])
 
     return (
-        <div>
-            <div>
-                {messages.map((elm, idx) => <div key={idx}><p>{elm.message}</p></div>)}
+        <div className="chat-window">
+            <div className="chat-header">
+                <p>Live Chat</p>
             </div>
-            <form onSubmit={handleSubmit}>
-                <label htmlFor="">Escriba el mensaje:</label>
-                <textarea name="" id="" cols="30" rows="10" onChange={(e) => setMessage(e.target.value)} value={message}></textarea>
-                <button type="submit">Enviar</button>
-            </form>
+            <div className="chat-body">
+                <ScrollToBottom className='message-container'>
+                    {messageList.map((elm, idx) => {
+                        return (
+                            <div key={idx} className="message" id={username !== elm.author ? 'you' : 'other'}>
+                                <div className="">
+                                    <div className="message-content">
+                                        <p>{elm.message}</p>
+                                    </div>
+                                    <div className="message-meta">
+                                        <p id="time">{elm.time}</p>
+                                        <p id="author">{elm.author}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </ScrollToBottom>
+            </div>
+            <div className="chat-footer">
+                <input
+                    type="text"
+                    value={currentMessage}
+                    placeholder="Hello!..."
+                    onChange={e => setCurrentMessage(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && sendMessage()} />
+                <button onClick={sendMessage}>&#9658;</button>
+            </div>
         </div>
     )
 }
